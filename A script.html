@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CYBER-SHELL V4.1</title>
+    <style>
+        * { box-sizing: border-box; }
+        body, html {
+            margin: 0; padding: 0;
+            width: 100%; height: 100%;
+            background-color: #0d0d0d;
+            font-family: 'Consolas', monospace;
+            color: #00ff41;
+            overflow: hidden;
+        }
+
+        /* --- Header: Hanya Tajuk & Titik Tiga --- */
+        header {
+            background: #111;
+            padding: 0 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #00ff41;
+            height: 55px;
+            position: relative;
+            z-index: 1001;
+        }
+
+        .menu-dots {
+            font-size: 28px;
+            cursor: pointer;
+            padding: 5px 10px;
+            user-select: none;
+        }
+
+        /* --- Dropdown Menu --- */
+        .dropdown {
+            display: none;
+            position: absolute;
+            top: 55px;
+            right: 10px;
+            background: #1a1a1a;
+            border: 1px solid #00ff41;
+            z-index: 2000;
+            min-width: 180px;
+            box-shadow: 0 0 15px rgba(0, 255, 65, 0.4);
+        }
+
+        .dropdown div {
+            padding: 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #333;
+            font-size: 14px;
+            color: #00ff41;
+        }
+
+        .dropdown div:hover { background: #00ff41; color: #000; }
+
+        /* --- Editor Page --- */
+        .page { 
+            width: 100%; 
+            height: calc(100% - 55px); 
+            display: none; 
+            position: absolute;
+            top: 55px;
+            left: 0;
+        }
+
+        #page-editor { display: flex; flex-direction: column; }
+        
+        textarea {
+            flex: 1; 
+            width: 100%; 
+            background: #000; 
+            color: #00ff41;
+            padding: 20px; 
+            border: none; 
+            outline: none; 
+            font-size: 16px;
+            font-family: 'Consolas', monospace;
+            resize: none;
+        }
+
+        /* --- Preview Page --- */
+        #page-preview { background: #fff; }
+        iframe { width: 100%; height: 100%; border: none; }
+
+        /* --- Floating Buttons --- */
+        .btn-circle {
+            position: fixed; bottom: 30px; right: 30px;
+            width: 65px; height: 65px; border-radius: 50%;
+            display: flex; justify-content: center; align-items: center;
+            cursor: pointer; border: 3px solid #000; z-index: 1000;
+        }
+        .btn-run { background: #00ff41; color: #000; font-size: 30px; box-shadow: 0 0 20px #00ff41; }
+        .btn-edit { background: #ff00ff; color: #fff; display: none; font-weight: bold; box-shadow: 0 0 20px #ff00ff; }
+
+        /* Input Hidden */
+        #file-input { display: none; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <span style="letter-spacing: 2px;">_CYBER_SHELL_</span>
+        <div class="menu-dots" onclick="toggleMenu(event)">⋮</div>
+        
+        <div id="myDropdown" class="dropdown">
+            <div onclick="openFile()">📂 BUKA FAIL</div>
+            <div onclick="saveToFile()">💾 SIMPAN FAIL</div>
+            <div onclick="clearScript()" style="color: #ff4444;">🗑️ PADAM SEMUA</div>
+        </div>
+    </header>
+
+    <input type="file" id="file-input" onchange="loadFile(event)">
+
+    <div id="page-editor" class="page">
+        <textarea id="code-input" spellcheck="false" placeholder="// Masukkan kod anda di sini..."></textarea>
+        <div id="run-btn" class="btn-circle btn-run" onclick="renderCode()">▶️</div>
+    </div>
+
+    <div id="page-preview" class="page">
+        <iframe id="output-frame"></iframe>
+        <div id="edit-btn" class="btn-circle btn-edit" onclick="showEditor()">EDIT</div>
+    </div>
+
+    <script>
+        const pEditor = document.getElementById('page-editor');
+        const pPreview = document.getElementById('page-preview');
+        const codeIn = document.getElementById('code-input');
+        const frame = document.getElementById('output-frame');
+        const dropdown = document.getElementById('myDropdown');
+        const btnRun = document.getElementById('run-btn');
+        const btnEdit = document.getElementById('edit-btn');
+
+        // Fungsi buka/tutup menu titik tiga
+        function toggleMenu(e) {
+            e.stopPropagation();
+            dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+        }
+
+        // 1. Simpan Fail ke memori fon
+        function saveToFile() {
+            const fileName = prompt("Nama fail & format (html/js/txt/io):", "index.html");
+            if (!fileName) return;
+
+            const blob = new Blob([codeIn.value], { type: "text/plain" });
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = fileName;
+            a.click();
+        }
+
+        // 2. Buka Fail dari ZArchiver atau Fail Manager
+        function openFile() {
+            document.getElementById('file-input').click();
+        }
+
+        function loadFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                codeIn.value = e.target.result;
+                localStorage.setItem('cyber_code', e.target.result);
+            };
+            reader.readAsText(file);
+        }
+
+        // 3. Bersihkan Editor
+        function clearScript() {
+            if(confirm("Padam semua kod?")) {
+                codeIn.value = "";
+                localStorage.removeItem('cyber_code');
+            }
+        }
+
+        // Fungsi Run & Papar UI
+        function renderCode() {
+            const code = codeIn.value;
+            localStorage.setItem('cyber_code', code);
+            
+            const doc = frame.contentDocument || frame.contentWindow.document;
+            doc.open();
+            doc.write(code);
+            doc.close();
+
+            pEditor.style.display = 'none';
+            btnRun.style.display = 'none';
+            
+            pPreview.style.display = 'block';
+            btnEdit.style.display = 'flex';
+        }
+
+        // Kembali ke Editor
+        function showEditor() {
+            pPreview.style.display = 'none';
+            btnEdit.style.display = 'none';
+            
+            pEditor.style.display = 'flex';
+            btnRun.style.display = 'flex';
+        }
+
+        // Tutup menu jika klik di tempat lain
+        window.onclick = () => { dropdown.style.display = 'none'; };
+
+        // Load kod terakhir automatik
+        window.onload = () => {
+            const saved = localStorage.getItem('cyber_code');
+            if (saved) codeIn.value = saved;
+        };
+    </script>
+</body>
+</html>
